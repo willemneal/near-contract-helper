@@ -6,7 +6,9 @@ const WRITE_TO_POSTGRES = true;
 
 const IdentityVerificationMethodService = {
     getIdentityVerificationMethod({ identityKey, kind }) {
-        return this.getIdentityVerificationMethod_sequelize({ identityKey, kind });
+        return Promise.all([
+            ...(WRITE_TO_POSTGRES ? [this.getIdentityVerificationMethod_sequelize({ identityKey, kind })] : [])
+        ]);
     },
 
     async getIdentityVerificationMethod_sequelize({ identityKey, kind }) {
@@ -17,31 +19,7 @@ const IdentityVerificationMethodService = {
             },
         });
 
-        return verificationMethod;
-    },
-
-    getOrCreateIdentityVerificationMethod({ identityKey, kind, securityCode, uniqueIdentityKey }) {
-        return this.getOrCreateIdentityVerificationMethod_sequelize({ identityKey, kind, securityCode, uniqueIdentityKey });
-    },
-
-    async getOrCreateIdentityVerificationMethod_sequelize({ identityKey, kind, securityCode, uniqueIdentityKey }) {
-        const [verificationMethod, verificationMethodCreated] = await IdentityVerificationMethod.findOrCreate({
-            where: {
-                identityKey,
-                kind,
-                claimed: false,
-            },
-            defaults: {
-                securityCode,
-                uniqueIdentityKey,
-            }
-        });
-
-        if (!verificationMethodCreated) {
-            await verificationMethod.update({ securityCode });
-        }
-
-        return verificationMethod;
+        return verificationMethod.toJSON();
     },
 
     async setSecurityCode({ identityKey, kind, securityCode, uniqueIdentityKey }) {
@@ -67,7 +45,7 @@ const IdentityVerificationMethodService = {
             await verificationMethod.update({ securityCode });
         }
 
-        return verificationMethod;
+        return verificationMethod.toJSON();
     },
 };
 

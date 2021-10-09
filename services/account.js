@@ -5,17 +5,18 @@ const { Account } = models;
 const WRITE_TO_POSTGRES = true;
 
 const AccountService = {
-    async createAccount(accountId) {
+    createAccount(accountId) {
         return ([
             ...(WRITE_TO_POSTGRES ? this.createAccount_sequelize(accountId) : []),
         ]);
     },
 
     async createAccount_sequelize(accountId) {
-        return Account.create({ accountId });
+        const account = await Account.create({ accountId });
+        return account.toJSON();
     },
 
-    async getAccount(accountId) {
+    getAccount(accountId) {
         return this.getAccount_sequelize(accountId);
     },
 

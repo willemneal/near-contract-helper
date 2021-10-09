@@ -12,15 +12,17 @@ const RecoveryMethodService = {
     },
 
     async createRecoveryMethod_sequelize({ accountId, kind, publicKey, securityCode = null }) {
-        return RecoveryMethod.create({
+        const method = await RecoveryMethod.create({
             accountId,
             kind,
             publicKey,
             ...(securityCode && { securityCode }),
         });
+
+        return method.toJSON();
     },
 
-    async deleteRecoveryMethod({ accountId, kind, publicKey }) {
+    deleteRecoveryMethod({ accountId, kind, publicKey }) {
         return ([
             ...(WRITE_TO_POSTGRES ? this.deleteRecoveryMethod_sequelize({ accountId, kind, publicKey }) : []),
         ]);
@@ -40,7 +42,7 @@ const RecoveryMethodService = {
         return recoveryMethod.destroy();
     },
 
-    async listAllRecoveryMethods(accountId) {
+    listAllRecoveryMethods(accountId) {
         return this.listAllRecoveryMethods_sequelize(accountId);
     },
 
@@ -80,7 +82,7 @@ const RecoveryMethodService = {
         return recoveryMethods.map((method) => method.toJSON());
     },
 
-    async setSecurityCode({ accountId, detail, kind, publicKey, securityCode }) {
+    setSecurityCode({ accountId, detail, kind, publicKey, securityCode }) {
         return Promise.all([
             ...(WRITE_TO_POSTGRES ? this.setSecurityCode_sequelize({ accountId, detail, kind, publicKey, securityCode }) : []),
         ]);
