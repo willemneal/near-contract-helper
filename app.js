@@ -5,12 +5,17 @@ const body = require('koa-json-body');
 const cors = require('@koa/cors');
 
 const constants = require('./constants');
+const AccountService = require('./services/account');
+const IdentityVerificationMethodService = require('./services/identity_verification_method');
+const RecoveryMethodService = require('./services/recovery_method');
 
 const {
     RECOVERY_METHOD_KINDS,
     SERVER_EVENTS,
     IDENTITY_VERIFICATION_METHOD_KINDS,
 } = constants;
+
+const USE_SERVICES = true;
 
 // render.com passes requests through a proxy server; we need the source IPs to be accurate for `koa-ratelimit`
 app.proxy = true;
@@ -104,6 +109,7 @@ const fundedAccountCreateRatelimitMiddleware = ratelimit({
 const {
     checkFundedAccountAvailable,
     clearFundedAccountNeedsDeposit,
+    clearFundedAccountNeedsDeposit_legacy,
     createFundedAccount,
     createIdentityVerifiedFundedAccount,
 } = require('./middleware/fundedAccount');
@@ -125,7 +131,9 @@ router.get('/checkFundedAccountAvailable', checkFundedAccountAvailable);
 router.post(
     '/fundedAccount/clearNeedsDeposit',
     createWithSequelizeAcccountMiddleware('body'),
-    clearFundedAccountNeedsDeposit
+    USE_SERVICES
+        ? clearFundedAccountNeedsDeposit
+        : clearFundedAccountNeedsDeposit_legacy,
 );
 
 const {
@@ -186,6 +194,10 @@ router.post('/account/recoveryMethods', checkAccountOwnership, async ctx => {
 });
 
 function createWithSequelizeAcccountMiddleware(source) {
+    if (USE_SERVICES) {
+        return (_, next) => next();
+    }
+
     if (source !== 'body' && source !== 'params') {
         throw new Error('invalid source for accountId provided');
     }
@@ -222,16 +234,28 @@ router.post(
     checkAccountOwnership,
     withPublicKey,
     async ctx => {
-        const { kind, publicKey } = ctx.request.body;
-        const [recoveryMethod] = await ctx.sequelizeAccount.getRecoveryMethods({
-            where: {
-                kind: kind,
-                publicKey: publicKey,
-            }
-        });
-        await recoveryMethod.destroy();
-        ctx.body = await recoveryMethodsFor(ctx.sequelizeAccount);
-    }
+        if (!USE_SERVICES) {
+            const { kind, publicKey } = ctx.request.body;
+            const [recoveryMethod] = await ctx.sequelizeAccount.getRecoveryMethods({
+                where: {
+                    kind: kind,
+                    publicKey: publicKey,
+                }
+            });
+            await recoveryMethod.destroy();
+            ctx.body = await recoveryMethodsFor(ctx.sequelizeAccount);
+            return;
+        }
+
+        const { accountId, kind, publicKey } = ctx.request.body;
+        const account = await AccountService.getAccount(accountId);
+        if (!account) {
+            ctx.throw(404, `Could not find account with accountId: '${accountId}'`);
+        }
+
+        await RecoveryMethodService.deleteRecoveryMethod({ accountId, kind, publicKey });
+        ctx.body = await RecoveryMethodService.listAllRecoveryMethods(accountId);
+    },
 );
 
 const { sendMail } = require('./utils/email');
@@ -282,14 +306,30 @@ router.get(
     '/account/walletState/:accountId',
     createWithSequelizeAcccountMiddleware('params'),
     async (ctx) => {
-        const { fundedAccountNeedsDeposit, accountId } = ctx.sequelizeAccount;
+        if (!USE_SERVICES) {
+            const { fundedAccountNeedsDeposit, accountId } = ctx.sequelizeAccount;
 
+            ctx.body = {
+                fundedAccountNeedsDeposit,
+                accountId,
+                requiredUnlockBalance: BN_UNLOCK_FUNDED_ACCOUNT_BALANCE.toString()
+            };
+            return;
+        }
+
+        const { accountId } = ctx.params;
+        const account = await AccountService.getAccount(accountId);
+        if (!account) {
+            ctx.throw(404, `Could not find account with accountId: '${accountId}'`);
+        }
+
+        const { fundedAccountNeedsDeposit } = account;
         ctx.body = {
-            fundedAccountNeedsDeposit,
             accountId,
-            requiredUnlockBalance: BN_UNLOCK_FUNDED_ACCOUNT_BALANCE.toString()
+            fundedAccountNeedsDeposit,
+            requiredUnlockBalance: BN_UNLOCK_FUNDED_ACCOUNT_BALANCE.toString(),
         };
-    }
+    },
 );
 
 const sendSecurityCode = async ({ ctx, securityCode, method, accountId, seedPhrase }) => {
