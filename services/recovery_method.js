@@ -45,8 +45,6 @@ const RecoveryMethodService = {
     },
 
     async deleteRecoveryMethod_sequelize({ accountId, kind, publicKey }) {
-        // TODO check indexes to determine whether this is the same as just deleting records matching the predicate
-        // i.e. RecoveryMethod.destroy({ where: { ... } })
         const [recoveryMethod] = await RecoveryMethod.findAll({
             where: {
                 accountId,
