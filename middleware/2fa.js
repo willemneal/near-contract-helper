@@ -1,7 +1,6 @@
 const nearAPI = require('near-api-js');
 const escapeHtml = require('escape-html');
 const password = require('secure-random-password');
-const Sequelize = require('sequelize');
 
 const constants = require('../constants');
 const messageContentUtils2fa = require('./2faMessageContent');
@@ -10,7 +9,6 @@ const RecoveryMethodService = require('../services/recovery_method');
 const emailHelper = require('../utils/email');
 const smsHelper = require('../utils/sms');
 
-const Op = Sequelize.Op;
 const { sendSms } = smsHelper;
 const { sendMail, get2faHtml } = emailHelper;
 const { SERVER_EVENTS, TWO_FACTOR_AUTH_KINDS } = constants;
@@ -35,7 +33,6 @@ const MULTISIG_CONTRACT_HASHES = process.env.MULTISIG_CONTRACT_HASHES ? process.
     '55E7imniT2uuYrECn17qJAk9fLcwQW4ftNSwmCJL5Di',
 ];
 
-const CODE_EXPIRY = 30 * 60000;
 const GAS_2FA_CONFIRM = process.env.GAS_2FA_CONFIRM || '100000000000000';
 
 // confirms a multisig request
@@ -101,7 +98,7 @@ const getRequestDataFromChain = async ({ requestId, ctx, accountId }) => {
     return request;
 };
 
-const sendCode = async (ctx, method, twoFactorMethod, requestId = -1, accountId = '') => {
+const sendCode = async (ctx, method, requestId = -1, accountId = '') => {
     const securityCode = password.randomPassword({ length: SECURITY_CODE_DIGITS, characters: password.digits });
 
     // Emit an event so that any listening test harnesses can use the security code without needing a full
@@ -241,7 +238,7 @@ const initCode = async (ctx) => {
     }
 
     const hasContractDeployed = await isContractDeployed(accountId);
-    let twoFactorMethod = await getTwoFactorRecoveryMethod(ctx, accountId);
+    const twoFactorMethod = await getTwoFactorRecoveryMethod(ctx, accountId);
     if (twoFactorMethod) {
         // check if multisig contract is already deployed
         if (hasContractDeployed || testContractDeployed) {
@@ -255,7 +252,7 @@ const initCode = async (ctx) => {
             kind,
         });
     } else {
-        twoFactorMethod = await RecoveryMethodService.createRecoveryMethod({
+        await RecoveryMethodService.createRecoveryMethod({
             accountId,
             detail,
             kind,
@@ -281,7 +278,7 @@ const initCode = async (ctx) => {
     }
 
     // client waits to deploy contract until code is verified
-    await sendCode(ctx, method, twoFactorMethod, -1, accountId);
+    await sendCode(ctx, method, -1, accountId);
     ctx.body = {
         message: '2fa initialized and code sent to verify method',
     };
@@ -296,7 +293,8 @@ const sendNewCode = async (ctx) => {
         console.warn(`account: ${accountId} does not have 2fa enabled`);
         ctx.throw(401);
     }
-    await sendCode(ctx, method, twoFactorMethod, requestId, accountId);
+
+    await sendCode(ctx, method, requestId, accountId);
     ctx.body = {
         message: '2fa code sent'
     };
