@@ -198,27 +198,6 @@ const isContractDeployed = async (accountId) => {
 };
 
 const getAccountAndMethod = async (ctx, accountId) => {
-    if (!USE_SERVICES) {
-        return getAccountAndMethod_legacy(ctx, accountId);
-    }
-
-    const [account] = await models.Account.findOrCreate({ where: { accountId } });
-    if (!account) {
-        console.warn(`account: ${accountId} should already exist when sending new code`);
-        ctx.throw(401);
-        return;
-    }
-    let [twoFactorMethod] = await account.getRecoveryMethods({
-        where: {
-            kind: {
-                [Op.startsWith]: '2fa-'
-            },
-        }
-    });
-    return { account, twoFactorMethod };
-};
-
-const getAccountAndMethod_legacy = async (ctx, accountId) => {
     const [account] = await models.Account.findOrCreate({ where: { accountId } });
     if (!account) {
         console.warn(`account: ${accountId} should already exist when sending new code`);
@@ -314,54 +293,6 @@ const sendNewCode = async (ctx) => {
 // http post http://localhost:3000/2fa/verify accountId=mattlock securityCode=430888
 // call when you want to verify the "current" securityCode
 const verifyCode = async (ctx) => {
-    if (!USE_SERVICES) {
-        return verifyCode_legacy(ctx);
-    }
-
-    const { accountId, securityCode, requestId } = ctx.request.body;
-    if (!securityCode || isNaN(parseInt(securityCode, 10)) || securityCode.length !== 6) {
-        console.warn('invalid 2fa code provided');
-        ctx.throw(401, 'invalid 2fa code provided');
-    }
-
-    const account = await models.Account.findOne({ where: { accountId } });
-    const [twoFactorMethod] = await account.getRecoveryMethods({
-        where: {
-            securityCode,
-            kind: {
-                [Op.startsWith]: '2fa-'
-            },
-        }
-    });
-    if (!twoFactorMethod) {
-        console.warn(`${accountId} has no 2fa method for the provided security code`);
-        ctx.throw(401, '2fa code not valid for request id');
-    }
-    // cannot test for requestId equality with negative integer???
-    // checking requestId here with weak equality (no type match)
-    if (twoFactorMethod.requestId != requestId) {
-        console.warn(`2fa code not valid for request id: ${requestId} and account: ${accountId}`);
-        ctx.throw(401, '2fa code not valid for request id');
-    }
-    // only verify codes that are 5 minutes old (if testing make this impossible)
-    if (twoFactorMethod.updatedAt < Date.now() - CODE_EXPIRY) {
-        console.warn(`2fa code expired for: ${accountId}`);
-        ctx.throw(401, '2fa code expired');
-    }
-    //security code valid
-    await twoFactorMethod.update({ requestId: -1, securityCode: null });
-    if (requestId !== -1) {
-        ctx.body = await confirmRequest(ctx.near, accountId, parseInt(requestId, 10));
-        return;
-    }
-    ctx.body = {
-        message: '2fa code verified', requestId: twoFactorMethod.requestId,
-    };
-};
-
-// http post http://localhost:3000/2fa/verify accountId=mattlock securityCode=430888
-// call when you want to verify the "current" securityCode
-const verifyCode_legacy = async (ctx) => {
     const { accountId, securityCode, requestId } = ctx.request.body;
 
     const account = await models.Account.findOne({ where: { accountId } });
