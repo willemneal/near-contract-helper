@@ -1,1 +1,31 @@
-{}
+{
+  "DB_SERVICES": {
+    "createdBy": "Andy Haynes",
+    "createdAt": "2021-10-18T19:50:56.618Z",
+    "development": {
+      "enabled": true,
+      "lastEditedBy": "Andy Haynes",
+      "lastEditedAt": "2021-10-18T19:50:56.618Z"
+    },
+    "testnet": {
+      "enabled": false,
+      "lastEditedBy": "Andy Haynes",
+      "lastEditedAt": "2021-10-18T19:50:56.618Z"
+    },
+    "testnet_STAGING": {
+      "enabled": false,
+      "lastEditedBy": "Andy Haynes",
+      "lastEditedAt": "2021-10-18T19:50:56.618Z"
+    },
+    "mainnet": {
+      "enabled": false,
+      "lastEditedBy": "Andy Haynes",
+      "lastEditedAt": "2021-10-18T19:50:56.618Z"
+    },
+    "mainnet_STAGING": {
+      "enabled": false,
+      "lastEditedBy": "Andy Haynes",
+      "lastEditedAt": "2021-10-18T19:50:56.618Z"
+    }
+  }
+}
