@@ -1,11 +1,10 @@
 const debug = require('debug');
 const Cache = require('node-cache');
 
+const Features = require('../config/features');
 const { EmailDomainBlacklist } = require('../models');
 const EmailDomainBlacklistService = require('../services/email_domain_blacklist');
 const { getStaleDate: getStaleDateUtil, isEntryStale } = require('./utils');
-
-const USE_SERVICES = false;
 
 class EmailDomainBlacklistDBClient {
     constructor({
@@ -21,7 +20,7 @@ class EmailDomainBlacklistDBClient {
         this.debugLog('persistValidationResult', validationResult);
 
         let blacklistEntry;
-        if (USE_SERVICES) {
+        if (Features.DB_SERVICES) {
             blacklistEntry = await EmailDomainBlacklistService.updateDomainBlacklistEntry({
                 staleAt: this.getStaleDate(Date.now()), // Allow caller to override
                 ...validationResult,
@@ -46,7 +45,7 @@ class EmailDomainBlacklistDBClient {
         let domainBlacklistEntry;
 
         try {
-            if (USE_SERVICES) {
+            if (Features.DB_SERVICES) {
                 domainBlacklistEntry = await EmailDomainBlacklistService.getDomainBlacklistEntry(normalizeDomainName);
             } else {
                 domainBlacklistEntry = await EmailDomainBlacklist.findOne({ where: { domainName: normalizeDomainName } });
